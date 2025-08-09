@@ -126,13 +126,16 @@ function DashboardScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      fetchEvents();
+      if (currentUser) {
+        fetchEvents(currentUser.uid);
+      }
     });
     return unsubscribe;
   }, []);
 
-  const fetchEvents = async () => {
-    const eventsSnapshot = await getDocs(collection(db, 'events'));
+  const fetchEvents = async (userId) => {
+    const q = query(collection(db, 'events'), where('creatorId', '==', userId));
+    const eventsSnapshot = await getDocs(q);
     const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setEvents(eventsList);
   };
@@ -144,7 +147,7 @@ function DashboardScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Events Dashboard</Text>
+      <Text style={styles.title}>My Events</Text>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
@@ -154,24 +157,20 @@ function DashboardScreen({ navigation }) {
             <Text>{item.description}</Text>
             <Text>{item.date}</Text>
             <View style={styles.buttonContainer}>
-              {item.creatorId === user?.uid && (
-                <>
-                  <Button title="Edit" onPress={() => navigation.navigate('EditEvent', { event: item })} />
-                  <Button title="Delete" onPress={() => {
-                    Alert.alert(
-                      'Confirm Delete',
-                      'Are you sure you want to delete this event?',
-                      [
-                        { text: 'Cancel' },
-                        { text: 'Delete', onPress: async () => {
-                          await deleteDoc(doc(db, 'events', item.id));
-                          fetchEvents();
-                        }}
-                      ]
-                    );
-                  }} />
-                </>
-              )}
+              <Button title="Edit" onPress={() => navigation.navigate('EditEvent', { event: item })} />
+              <Button title="Delete" onPress={() => {
+                Alert.alert(
+                  'Confirm Delete',
+                  'Are you sure you want to delete this event?',
+                  [
+                    { text: 'Cancel' },
+                    { text: 'Delete', onPress: async () => {
+                      await deleteDoc(doc(db, 'events', item.id));
+                      fetchEvents(user.uid);
+                    }}
+                  ]
+                );
+              }} />
               <Button title="Favorite" onPress={async () => {
                 await addDoc(collection(db, 'favorites'), { userId: user.uid, eventId: item.id });
               }} />
@@ -258,7 +257,9 @@ function FavoritesScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      fetchFavorites(currentUser);
+      if (currentUser) {
+        fetchFavorites(currentUser);
+      }
     });
     return unsubscribe;
   }, []);
@@ -316,7 +317,7 @@ export default function App() {
       <Stack.Navigator initialRouteName="SignIn">
         <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign In' }} />
         <Stack.Screen name="SignUp" component={SignUpScreen} options={{ title: 'Sign Up' }} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'My Events' }} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: 'Create Event' }} />
         <Stack.Screen name="EditEvent" component={EditEventScreen} options={{ title: 'Edit Event' }} />
         <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Favorites' }} />
